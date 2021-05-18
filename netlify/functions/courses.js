@@ -70,13 +70,16 @@ exports.handler = async function(event) {
   // get the documents from the query
   let sections = sectionsQuery.docs
 
+  //create a variable to hold the total rating for the course
+  let totalCourseRating = 0
+
   // loop through the documents
-  for (let i=0; i < sections.length; i++) {
+  for (let sectionIndex=0; sectionIndex < sections.length; sectionIndex++) {
     // get the document ID of the section
-    let sectionId = sections[i].id
+    let sectionId = sections[sectionIndex].id
 
     // get the data from the section
-    let sectionData = sections[i].data()
+    let sectionData = sections[sectionIndex].data()
     
     // create an Object to be added to the return value of our lambda
     let sectionObject = {}
@@ -94,7 +97,63 @@ exports.handler = async function(event) {
     returnValue.sections.push(sectionObject)
 
     // 🔥 your code for the reviews/ratings goes here
+
+    //get the reviews for this section and store them in memory
+    let reviewsQuery = await db.collection(`reviews`).where(`sectionId`, `==`, sectionId).get()
+
+    //get the documents from the query
+    let reviews = reviewsQuery.docs
+
+    //create an array to hold the reviews for the section
+    returnValue.sections[sectionIndex].sectionReviews = []
+
+    //create a variable to hold the total rating for the section and set it equal to zero
+    let totalRating = 0
+
+    //loop through the review documents
+    for (reviewIndex = 0; reviewIndex < reviews.length; reviewIndex++){
+      //get the id from the review document
+      reviewId = reviews[reviewIndex].id
+      
+      //get the data from the review document
+      let reviewData = reviews[reviewIndex].data()
+
+      //create an object for the reviews
+      let reviewObject = {
+        body: reviewData.body,
+        rating: reviewData.rating
+      }
+
+      //add the rating to totalReview
+      totalRating = totalRating + reviewData.rating
+
+      //add the body to the section object
+      returnValue.sections[sectionIndex].sectionReviews.push(reviewObject)
+      
+    }
+
+    //add total number of reviews for the section to the section object
+    returnValue.sections[sectionIndex].totalSectionReviews = reviews.length
+
+    //add the average rating for the section to the section object
+    returnValue.sections[sectionIndex].avgSectionRating = (totalRating/reviews.length)
+
+    //add the total rating to the course totalCourseRating variable
+    totalCourseRating = totalCourseRating + totalRating
+      
+
   }
+
+  //create a variable to hold the total number of reviews for the course
+  let totalNumReviews = 0
+  //loop through the sections array to get the total number of ratings for the course
+  for (i=0; i < returnValue.sections.length; i++){
+    totalNumReviews = totalNumReviews + returnValue.sections[i].totalSectionReviews
+  }
+  //add the total number of reviews for the course to the return value
+  returnValue.numberOfCourseReviews = totalNumReviews
+  //add the average rating for the course to the return value
+  returnValue.avgCourseRating = totalCourseRating/totalNumReviews
 
   // return the standard response
   return {
